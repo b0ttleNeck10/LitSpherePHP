@@ -15,28 +15,28 @@
             <div class="parent">
                 <nav class="nav_container">
                     <ul>
-                        <img src="nav_icon/Logo and Name.svg" alt="Logo & Name" style="width: 200px; height: 90px; margin-bottom: 25px; margin-top: 25px;">
+                        <img src="/nav_icon/Logo and Name.svg" alt="Logo & Name" style="width: 200px; height: 90px; margin-bottom: 25px; margin-top: 25px;">
                         <li>
                             <a href="bookprev.php">
-                                <img src="nav_icon/Home Icon.svg" alt="Home">
+                                <img src="/nav_icon/Home Icon.svg" alt="Home">
                                 <span class="nav_item">Home</span> 
                             </a>                        
                         </li>
                         <li>
-                            <a href="mylibrary.html">
-                                <img src="nav_icon/Library Icon.svg" alt="Library">
+                            <a href="mylib.php">
+                                <img src="/nav_icon/Library Icon.svg" alt="Library">
                                 <span class="nav_item">My Library</span>
                             </a>
                         </li>
                         <li>
-                            <a href="history.html">
-                                <img src="nav_icon/History Icon.svg" alt="History">
+                            <a href="history.php">
+                                <img src="/nav_icon/History Icon.svg" alt="History">
                                 <span class="nav_item">History</span>
                             </a>
                         </li>
                         <li>
-                            <a href="profile.html">
-                                <img src="nav_icon/Profile Icon.svg" alt="Profile">
+                            <a href="profile.php">
+                                <img src="/nav_icon/Profile Icon.svg" alt="Profile">
                                 <span class="nav_item">Profile</span>
                             </a>
                         </li>

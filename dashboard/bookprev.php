@@ -18,7 +18,7 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>LitSphere</title>
-        <link rel="icon" href="favicon/favicon.ico">
+        <link rel="icon" href="/favicon/favicon.ico">
         <link rel="stylesheet" href="reader.css">
         <link href='https://fonts.googleapis.com/css?family=Poppins' rel='stylesheet'>
         <link href='https://fonts.googleapis.com/css?family=Schibsted Grotesk' rel='stylesheet'>
@@ -90,7 +90,7 @@
                     <div class="book_wrapper">
                         <div class="book_container">
                             <?php while ($book = $booksResult->fetch_assoc()): ?>
-                                <div class="book" onclick="openBookDetails('<?php echo htmlspecialchars($book['CoverImageURL']); ?>', '<?php echo htmlspecialchars($book['Title']); ?>', '<?php echo htmlspecialchars($book['AuthorName']); ?>', '<?php echo htmlspecialchars($book['Description']); ?>', '<?php echo htmlspecialchars($book['Genre']); ?>')">
+                                <div class="book" onclick="openBookDetails('<?php echo htmlspecialchars($book['CoverImageURL']); ?>', '<?php echo htmlspecialchars($book['Title']); ?>', '<?php echo htmlspecialchars($book['AuthorName']); ?>', '<?php echo htmlspecialchars($book['Description']); ?>', '<?php echo htmlspecialchars($book['Genre']); ?>', '<?php echo $book['BookID']; ?>')">
                                     <img src="<?php echo htmlspecialchars($book['CoverImageURL']); ?>" alt="Book Cover">
                                     <p id="button1">Read Now!</p>
                                 </div>
@@ -122,44 +122,13 @@
                                 <h3 class="bookinf modal-genre"></h3>
                                 <h2 class="bookinf">Description</h2>
                                 <h3 class="bookinf modal-description"></h3> <!-- Placeholder for dynamic content -->
-                                <a href="#" class="seemore">See more</a>
+                                <a href="bookpage.php?book_id=<?php echo htmlspecialchars($book['BookID']); ?>" class="seemore">See more</a>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>           
         </div>
-
-        
-            <!-- paras Popup
-            <div class="popupbook">                    
-                <div class="popupbook-content">
-                    <i class="fa-solid fa-xmark" id="close"></i> -->
-                    <!--Paras image-->
-                    <!-- <div class="imagecont">
-                        <img src="book_img/image1.svg"> -->
-                        <!--Paras Text-->
-                    <!-- <div class="textcontpopup"> -->
-                        <!--title-->
-                        <!-- <h1 class="BookTitle">IT ENDS WITH US</h1>
-                        <div class="bookinfo"> -->
-                            <!--author-->
-                            <!-- <h2 class="bookinf">Author</h2>
-                            <h3 class="bookinf">Isaac Nelson</h3> -->
-                            <!--genre-->
-                            <!-- <h2 class="bookinf">Genre</h2>
-                            <h3 class="bookinf">Romance Fiction</h3> -->
-                            <!--description-->
-                            <!-- <h2 class="bookinf">Description</h2>
-                            <h3 class="bookinf">
-                                Lily hasn’t always had it easy, but that’s never stopped her from working hard for the life she wants. She’s come a long way from the small town in Maine where she grew up — she graduated from college, moved to Boston, and started her own business. So when she feels a spark with a gorgeous neurosurgeon named Ryle Kincaid, everything in Lily’s life suddenly seems almost too good to be true. <br> <br>
-                                Ryle is assertive, stubborn, maybe even a little arrogant. He’s also sensitive, brilliant, and has a total soft spot for Lily.
-                            </h3>
-                            <a href="#" class="seemore">See more</a>  
-                        </div>
-                    </div>                              
-                </div>
-            </div> -->
         <script>
             const dropdownBtn = document.querySelector('.dropBtn');
             const categories = document.querySelector('.categories');
@@ -176,7 +145,7 @@
                 }
             });
 
-            function openBookDetails(imageURL, title, author, description, genre) {
+            function openBookDetails(imageURL, title, author, description, genre, bookID) {
                 console.log("Opening book details:", title); // Debug line
                 document.querySelector('.modal-image').src = imageURL; // Assuming you have this element
                 document.querySelector('.modal-title').textContent = title;
@@ -184,6 +153,10 @@
                 document.querySelector('.modal-description').textContent = description;
                 document.querySelector('.modal-genre').textContent = genre; // Genre
                 document.querySelector('.popupbook').style.display = 'flex';
+
+                // Update the "See more" link with the book ID
+                const seeMoreLink = document.querySelector('.seemore');
+                seeMoreLink.href = `bookpage.php?book_id=${bookID}`;
             }
 
             // Close modal function
