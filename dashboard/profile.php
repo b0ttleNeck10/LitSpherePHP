@@ -1,10 +1,117 @@
 <?php
     session_start();
     include('../connection.php');
-    if (!isset($_SESSION['username'])) {
-        header("Location: login.php"); // Redirect to login if not logged in
+
+    // Check if user is logged in
+    if (!isset($_SESSION['fname'])) {
+        header("Location: ../index.php"); // Redirect to login if not logged in
         exit();
     }
+
+    $username = $_SESSION['username']; // Assuming username is stored in session
+
+    // Initialize error and success messages
+    $errorMessages = [];
+    $successMessage = '';
+
+    if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+        // Get the form data
+        $currentPassword = isset($_POST['current_password']) ? $_POST['current_password'] : '';
+        $newPassword = isset($_POST['new_password']) ? $_POST['new_password'] : '';
+        $confirmPassword = isset($_POST['confirm_password']) ? $_POST['confirm_password'] : '';
+
+        // Check if current password, new password, and confirmation are provided
+        if (empty($currentPassword) || empty($newPassword) || empty($confirmPassword)) {
+            $errorMessages[] = "All fields are required.";
+        }
+
+        // Check if the new password and confirmation match
+        if ($newPassword !== $confirmPassword) {
+            $errorMessages[] = "New password and confirmation do not match.";
+        }
+
+        // Check if the new password meets the minimum length requirement
+        if (strlen($newPassword) < 6) {
+            $errorMessages[] = "Password must be at least 6 characters long.";
+        }
+
+        // Password strength validation: At least one letter, one number, and one special character
+        if (!preg_match('/[A-Za-z]/', $newPassword) || !preg_match('/\d/', $newPassword) || !preg_match('/[\W_]/', $newPassword)) {
+            $errorMessages[] = "Password must contain at least one letter, one number, and one special character.";
+        }
+
+        // Proceed with password change if no errors
+        if (empty($errorMessages)) {
+            // Fetch the current password hash from the database
+            $stmt = $conn->prepare("SELECT PasswordHash FROM Users WHERE Email = ?");
+            $stmt->bind_param("s", $username);  // Assuming the 'username' is stored as the Email
+            $stmt->execute();
+            $stmt->bind_result($storedPasswordHash);
+            $stmt->fetch();
+            $stmt->close();
+
+            // Check if the entered current password is correct
+            if (!password_verify($currentPassword, $storedPasswordHash)) {
+                $errorMessages[] = "Current password is incorrect.";
+            } else {
+                // Hash the new password
+                $newPasswordHash = password_hash($newPassword, PASSWORD_DEFAULT);
+
+                // Update the password in the database
+                $updateStmt = $conn->prepare("UPDATE Users SET PasswordHash = ? WHERE Email = ?");
+                $updateStmt->bind_param("ss", $newPasswordHash, $username);
+
+                if ($updateStmt->execute()) {
+                    $successMessage = "Password updated successfully!";
+                } else {
+                    $errorMessages[] = "Error updating password. Please try again.";
+                }
+
+                $updateStmt->close();
+            }
+        }
+    }
+
+    // Handle personal details update
+    if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['new_firstname']) && isset($_POST['new_lastname']) && isset($_POST['new_email'])) {
+        // Get the form data
+        $newFirstName = isset($_POST['new_firstname']) ? $_POST['new_firstname'] : '';
+        $newLastName = isset($_POST['new_lastname']) ? $_POST['new_lastname'] : '';
+        $newEmail = isset($_POST['new_email']) ? $_POST['new_email'] : '';
+
+        // Validate the inputs (simple validation)
+        if (empty($newFirstName) || empty($newLastName) || empty($newEmail)) {
+            $errorMessages[] = "All fields are required.";
+        }
+
+        // Check if the email is valid
+        if (!filter_var($newEmail, FILTER_VALIDATE_EMAIL)) {
+            $errorMessages[] = "Invalid email format.";
+        }
+
+        // Proceed with updating the details if no errors
+        if (empty($errorMessages)) {
+            // Update the user's personal details in the database
+            $updateStmt = $conn->prepare("UPDATE Users SET FirstName = ?, LastName = ?, Email = ? WHERE Email = ?");
+            $updateStmt->bind_param("ssss", $newFirstName, $newLastName, $newEmail, $username);
+
+            if ($updateStmt->execute()) {
+                // Update the session variables if the email was changed
+                $_SESSION['fname'] = $newFirstName;
+                $_SESSION['lname'] = $newLastName;
+                $_SESSION['username'] = $newEmail; // Update username if email is changed
+
+                $successMessage = "Personal details updated successfully!";
+            } else {
+                $errorMessages[] = "Error updating personal details. Please try again.";
+            }
+
+            $updateStmt->close();
+        }
+    }
+
+    // Close the database connection
+    $conn->close();
 ?>
 
 <!doctype HTML>
@@ -14,7 +121,7 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>LitSphere</title>
-        <link rel="icon" href="favicon/favicon.ico">
+        <link rel="icon" href="/favicon/favicon.ico">
         <link rel="stylesheet" href="reader.css ">        
         <link href='https://fonts.googleapis.com/css?family=Poppins' rel='stylesheet'>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -48,7 +155,11 @@
                             <img src="/nav_icon/Profile Icon.svg" alt="Profile">
                             <span class="nav_item">
                                 <?php 
-                                    echo htmlspecialchars($_SESSION['username']); 
+                                    if (isset($_SESSION['fname'])) {
+                                        echo htmlspecialchars($_SESSION['fname']);
+                                    } else {
+                                        echo "Guest"; // Or some default text if the session variable is not set
+                                    }
                                 ?>
                             </span>
                         </a>
@@ -70,29 +181,54 @@
                         </div>
                         <div class="dropdown-content">
                             <p>Your password must be at least 6 characters and should include a combination of numbers, letters, and special characters (!$@%).</p>
-                            <form action="">
-                                <input type="password" id="enterpassword" name="enterpassword" placeholder=" Enter Password" class="inputbox"><br>
-                                <input type="password" id="enternewpassword" name="enternewpassword" placeholder=" Enter New Password" class="inputbox"><br>
-                                <input type="password" id="reenternewpassword" name="reenternewpassword" placeholder=" Re-Enter New Password" class="inputbox"><br>
-                            </form>                            
+                            <?php if (!empty($successMessage)): ?>
+                                <p class="success-message" style="color: green;"><?php echo $successMessage; ?></p>
+                            <?php endif; ?>
+
+                            <?php if (!empty($errorMessages)): ?>
+                                <ul class="error-messages" style="color: red;">
+                                    <?php foreach ($errorMessages as $message): ?>
+                                        <li><?php echo $message; ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+                            <form action="profile.php" method="post">
+                                <input type="password" id="current_password" name="current_password" placeholder=" Enter Password" class="inputbox" required><br>
+                                <input type="password" id="new_password" name="new_password" placeholder=" Enter New Password" class="inputbox" required><br>
+                                <input type="password" id="confirm_password" name="confirm_password" placeholder=" Re-Enter New Password" class="inputbox" required><br>
+                                <button type="submit" id="savePassBtn">Save Password</button>
+                            </form>                          
                         </div>
                         <div class="perso-holder">
                             <button class="showBtn">
                                 <i class="fa-solid fa-chevron-right" style="font-size: .9rem; margin-right: .8rem;"></i>
                                 <p>Personal Details</p>
-                            </button>                            
+                            </button>
                         </div>  
                         <div class="dropdown-content">
-                            <p>Your password must be at least 6 characters and should include a combination of numbers, letters, and special characters (!$@%).</p>
-                            <form action="">
-                                <input type="text" id="enter_firstname" name="enterpassword" placeholder="Enter Name" class="inputbox"><br>
-                                <input type="text" id="enter_lastname" name="enternewpassword" placeholder=" Enter New Password" class="inputbox"><br>
-                                <input type="text" id="enter_email" name="reenternewpassword" placeholder=" Re-Enter New Password" class="inputbox"><br>
-                            </form>                            
+                            <?php if (!empty($successMessage)): ?>
+                                <p class="success-message" style="color: green;"><?php echo $successMessage; ?></p>
+                            <?php endif; ?>
+
+                            <?php if (!empty($errorMessages)): ?>
+                                <ul class="error-messages" style="color: red;">
+                                    <?php foreach ($errorMessages as $message): ?>
+                                        <li><?php echo $message; ?></li>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+                            <form action="profile.php" method="post">
+                                <input type="text" id="new_firstname" name="new_firstname" placeholder=" Enter First Name" class="inputbox" required><br>
+                                <input type="text" id="new_lastname" name="new_lastname" placeholder=" Enter Last Name" class="inputbox" required><br>
+                                <input type="text" id="new_email" name="new_email" placeholder=" Enter Email" class="inputbox" required><br>
+                                <button type="submit" id="saveDetails">Save Details</button>
+                            </form>               
                         </div>
                     </div>
                     <div class="saveChangesBtn">
-                        <button id="multiBtn" type="submit">Save Changes</button>
+                        <form action="logout.php" method="post">
+                            <button type="submit" id="logoutBtn">Log Out</button>
+                        </form>
                     </div>                    
                     <!-- diri end -->                    
                 </div>

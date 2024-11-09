@@ -1,58 +1,68 @@
 <?php
-    session_start();
-    include('../connection.php');
+session_start();
+include('../connection.php');
 
-    if (!isset($_SESSION['username'])) {
-        header("Location: login.php");
+// Check if user is logged in
+if (!isset($_SESSION['username'])) {
+    header("Location: login.php");
+    exit();
+}
+
+// Check if userID is set in session
+if (!isset($_SESSION['userID'])) {
+    header("Location: login.php"); // Redirect to login if userID is not set
+    exit();
+}
+
+// Get the book ID from the URL
+$bookID = isset($_GET['book_id']) ? intval($_GET['book_id']) : 0;
+
+// Fetch book details
+$bookQuery = $conn->prepare("SELECT * FROM Books WHERE BookID = ?");
+$bookQuery->bind_param("i", $bookID);
+$bookQuery->execute();
+$bookResult = $bookQuery->get_result();
+
+if ($bookResult->num_rows === 0) {
+    echo "Book not found.";
+    exit();
+}
+
+$book = $bookResult->fetch_assoc();
+
+// Handle the request book form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Get the data from the form
+    $userID = $_SESSION['userID']; // Get user ID from session
+    $days = intval($_POST['day']);  // Get the days for the return date
+    $purpose = $_POST['purpose'];   // Get the purpose of borrowing
+
+    // Calculate dates
+    $borrowDate = date('Y-m-d'); // Current date
+    $dueDate = date('Y-m-d', strtotime("+$days days")); // Due date based on the number of days
+
+    // Insert a new record into the Borrow table with 'Active' status
+    $insertQuery = $conn->prepare("INSERT INTO Borrow (BookID, UserID, BorrowDate, DueDate, Status) VALUES (?, ?, ?, ?, 'Requested')");
+    $insertQuery->bind_param("iiss", $bookID, $userID, $borrowDate, $dueDate);
+
+    if ($insertQuery->execute()) {
+        // Insert the borrowing history
+        $historyQuery = $conn->prepare("INSERT INTO BorrowingHistory (UserID, BookID, BorrowDate) VALUES (?, ?, ?)");
+        $historyQuery->bind_param("iis", $userID, $bookID, $borrowDate);
+        $historyQuery->execute();
+
+        // Update the book status to 'Borrowed' (indicating it has been requested)
+        $updateQuery = $conn->prepare("UPDATE Books SET Status = 'Borrowed' WHERE BookID = ?");
+        $updateQuery->bind_param("i", $bookID);
+        $updateQuery->execute();
+
+        // Redirect to the same page with a success query parameter
+        header("Location: bookpage.php?book_id=$bookID&success=1");
         exit();
+    } else {
+        echo "Error processing your request.";
     }
-
-    // Check if userID is set
-    if (!isset($_SESSION['userID'])) {
-        header("Location: login.php"); // Redirect to login if userID is not set
-        exit();
-    }
-
-    $bookID = isset($_GET['book_id']) ? intval($_GET['book_id']) : 0;
-
-    // Fetch book details
-    $bookQuery = $conn->prepare("SELECT * FROM Books WHERE BookID = ?");
-    $bookQuery->bind_param("i", $bookID);
-    $bookQuery->execute();
-    $bookResult = $bookQuery->get_result();
-
-    if ($bookResult->num_rows === 0) {
-        echo "Book not found.";
-        exit();
-    }
-
-    $book = $bookResult->fetch_assoc();
-
-    // Handle the request book form submission
-    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        $userID = $_SESSION['userID']; // Use the correct session key
-        $days = intval($_POST['day']);
-        $purpose = $_POST['purpose'];
-
-        // Calculate dates
-        $borrowDate = date('Y-m-d'); // Current date
-        $dueDate = date('Y-m-d', strtotime("+$days days")); // Due date
-
-        // Prepare insert statement
-        $insertQuery = $conn->prepare("INSERT INTO Borrow (BookID, UserID, BorrowDate, DueDate, Purpose) VALUES (?, ?, ?, ?, ?)");
-        $insertQuery->bind_param("iisss", $bookID, $userID, $borrowDate, $dueDate, $purpose);
-
-        if ($insertQuery->execute()) {
-            // Update the book status to 'Borrowed'
-            $updateQuery = $conn->prepare("UPDATE Books SET Status = 'Borrowed' WHERE BookID = ?");
-            $updateQuery->bind_param("i", $bookID);
-            $updateQuery->execute();
-        
-            // Redirect with success parameter
-            header("Location: bookpage.php?book_id=$bookID&success=1");
-            exit();
-        }
-    }
+}
 ?>
 
 <!doctype HTML>
@@ -73,7 +83,7 @@
                 <ul>
                     <img src="/nav_icon/Logo and Name.svg" alt="Logo & Name" style="width: 200px; height: 90px; margin-bottom: 25px; margin-top: 25px;">
                     <li>
-                        <a href="bookprev.php">
+                        <a href="bookprev.php" class="active">
                             <img src="/nav_icon/Home Icon.svg" alt="Home">
                             <span class="nav_item">Home</span> 
                         </a>                        
@@ -95,7 +105,11 @@
                             <img src="/nav_icon/Profile Icon.svg" alt="Profile">
                             <span class="nav_item">
                                 <?php 
-                                    echo htmlspecialchars($_SESSION['username']); 
+                                    if (isset($_SESSION['fname'])) {
+                                        echo htmlspecialchars($_SESSION['fname']);
+                                    } else {
+                                        echo "Guest"; // Or some default text if the session variable is not set
+                                    }
                                 ?>
                             </span>
                         </a>
@@ -125,7 +139,18 @@
                         </div>
                     </div>
                 </div>
-                <div class="req_wrapper" style="display: none;">
+                <footer>
+                    <hr>
+                    <p>Copyrights &#169; 2024 Litsphere. All Rights Reserved.</p>
+                    <div class="iContainer">
+                        <a href="#"><img src="/footer_icon/Facebook Logo.png" alt="Facebook Logo"></a>
+                        <a href="#"><img src="/footer_icon/Twitter Logo.png" alt="Twitter Logo"></a>
+                        <a href="#"><img src="/footer_icon/Instagram Logo.png" alt="Instagram Logo"></a>
+                    </div>        
+                </footer>  
+            </div>
+           <div class="request" style="display: none;">
+                <div class="req_wrapper" style="display: flex;">
                     <i class="fa-solid fa-xmark" id="closeRequest"></i>
                     <div class="verif_container" style="visibility: hidden;">
                         <h4>Request Sent!</h4>
@@ -153,34 +178,26 @@
                             <label for="in_house">In House Reading</label><br>
                             <button id="submit_req" type="submit">Request Book</button>
                         </form>
-                    </div>
-                </div>
-                <footer>
-                    <hr>
-                    <p>Copyrights &#169; 2024 Litsphere. All Rights Reserved.</p>
-                    <div class="iContainer">
-                        <a href="#"><img src="/footer_icon/Facebook Logo.png" alt="Facebook Logo"></a>
-                        <a href="#"><img src="/footer_icon/Twitter Logo.png" alt="Twitter Logo"></a>
-                        <a href="#"><img src="/footer_icon/Instagram Logo.png" alt="Instagram Logo"></a>
-                    </div>        
-                </footer>  
-            </div>            
+                    </div>                
+                </div>          
+           </div> 
         </div>
         <script>
             const requestButton = document.getElementById('requestButton');
             const reqWrapper = document.querySelector('.req_wrapper');
             const closeButton = document.getElementById('closeRequest');
             const verifContainer = document.querySelector('.verif_container');
+            const request = document.querySelector('.request');
 
             // Show the request form when the request button is clicked
             requestButton.addEventListener('click', function() {
-                reqWrapper.style.display = 'flex';
+                request.style.display = 'flex';
                 verifContainer.style.display = 'none'; // Reset the success message
             });
 
             // Close the request form when the close button is clicked
             closeButton.addEventListener('click', function() {
-                reqWrapper.style.display = 'none';
+                request.style.display = 'none';
             });
 
             // Check if the request was successful by looking for a query parameter

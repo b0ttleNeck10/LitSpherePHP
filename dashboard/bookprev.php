@@ -1,11 +1,14 @@
 <?php
     session_start();
     include('../connection.php');
-    if (!isset($_SESSION['username'])) {
-        header("Location: login.php"); // Redirect to login if not logged in
+    
+    // Ensure user is logged in
+    if (!isset($_SESSION['fname'])) {
+        echo "You must be logged in to view books.";
         exit();
     }
 
+    // Prepare and execute query to get all available books
     $booksQuery = $conn->prepare("SELECT * FROM Books WHERE Status = 'Available'");
     $booksQuery->execute();
     $booksResult = $booksQuery->get_result();
@@ -23,7 +26,6 @@
         <link href='https://fonts.googleapis.com/css?family=Poppins' rel='stylesheet'>
         <link href='https://fonts.googleapis.com/css?family=Schibsted Grotesk' rel='stylesheet'>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" integrity="sha512-Kc323vGBEqzTmouAECnVceyQqyqdsSiqLQISBL29aUW4U/M7pSPA/gEUZQqv1cwx4OnYxTxve5UMg5GT6L4JJg==" crossorigin="anonymous" referrerpolicy="no-referrer" />
-        
     </head>
     <body>        
         <div class="parent">
@@ -52,8 +54,12 @@
                         <a href="profile.php">
                             <img src="/nav_icon/Profile Icon.svg" alt="Profile">
                             <span class="nav_item">
-                                <?php 
-                                    echo htmlspecialchars($_SESSION['username']); 
+                                <?php
+                                    if (isset($_SESSION['fname'])) {
+                                        echo htmlspecialchars($_SESSION['fname']);
+                                    } else {
+                                        echo "Guest"; // Or some default text if the session variable is not set
+                                    }
                                 ?>
                             </span>
                         </a>
@@ -65,7 +71,7 @@
                     <div class="search_cat_wrapper">
                         <div class="search_container">
                             <i class="fa-solid fa-magnifying-glass"></i>
-                            <input type="text" id="search_bar" placeholder="Search books">
+                            <input type="text" id="search_bar" placeholder="Search books" oninput="searchBooks()">
                         </div>
                         <div class="cat_container">
                             <button class="dropBtn">
@@ -88,7 +94,8 @@
                         <a href="#"><p>Thriller</p></a>
                     </div>
                     <div class="book_wrapper">
-                        <div class="book_container">
+                        <div class="no_book"><p>There's no book that matches your search</p></div>
+                        <div class="book_container" id="book_container">
                             <?php while ($book = $booksResult->fetch_assoc()): ?>
                                 <div class="book" onclick="openBookDetails('<?php echo htmlspecialchars($book['CoverImageURL']); ?>', '<?php echo htmlspecialchars($book['Title']); ?>', '<?php echo htmlspecialchars($book['AuthorName']); ?>', '<?php echo htmlspecialchars($book['Description']); ?>', '<?php echo htmlspecialchars($book['Genre']); ?>', '<?php echo $book['BookID']; ?>')">
                                     <img src="<?php echo htmlspecialchars($book['CoverImageURL']); ?>" alt="Book Cover">
@@ -130,6 +137,65 @@
             </div>           
         </div>
         <script>
+            let typingTimer;
+            const typingInterval = 200; // Adjust delay (in milliseconds)
+
+            function searchBooks() {
+                clearTimeout(typingTimer); // Clear any existing timer to debounce the input
+                typingTimer = setTimeout(function() {
+                    const searchQuery = document.getElementById('search_bar').value.trim(); // Trim whitespace to handle accidental spaces
+
+                    // If search input is empty, load all books
+                    if (searchQuery === "") {
+                        loadAllBooks(); // Fetch and display all books
+                    } else {
+                        performSearch(searchQuery); // Perform the search query
+                    }
+                }, typingInterval);
+            }
+
+            // Function to perform the search when user types
+            function performSearch(query) {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', 'search_books.php?query=' + encodeURIComponent(query), true);
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        const bookContainer = document.getElementById('book_container');
+                        const noBookMessage = document.querySelector('.no_book'); // Get the no_book message div
+
+                        // Update book container with the search results
+                        bookContainer.innerHTML = xhr.responseText;
+
+                        // Show or hide the "No books found" message
+                        if (xhr.responseText.trim() === '') {
+                            noBookMessage.style.display = 'flex';  // Show the "No books found" message
+                        } else {
+                            noBookMessage.style.display = 'none';   // Hide the message if books are found
+                        }
+                    }
+                };
+                xhr.send();
+            }
+
+            // Function to load all books when the search input is cleared
+            function loadAllBooks() {
+                const xhr = new XMLHttpRequest();
+                xhr.open('GET', 'fetch_books.php', true); // Fetch all available books from the server
+                xhr.onreadystatechange = function () {
+                    if (xhr.readyState === 4 && xhr.status === 200) {
+                        const bookContainer = document.getElementById('book_container');
+                        const noBookMessage = document.querySelector('.no_book'); // Get the no_book message div
+
+                        // Update the book container with the full list of books
+                        bookContainer.innerHTML = xhr.responseText;
+
+                        // Hide the "No books found" message if books are present
+                        noBookMessage.style.display = 'none';
+                    }
+                };
+                xhr.send();
+            }
+
             const dropdownBtn = document.querySelector('.dropBtn');
             const categories = document.querySelector('.categories');
 
@@ -163,16 +229,6 @@
             document.querySelector('#close').onclick = function() {
                 document.querySelector('.popupbook').style.display = 'none';
             };
-
-            // // pop up click
-            // document.querySelector(".book").addEventListener("click", function() {
-            //     document.querySelector(".popupbook").style.visibility = "visible";
-            // });
-
-            // // pop close button
-            // document.querySelector('.fa-xmark').addEventListener("click", function() {
-            //     document.querySelector(".popupbook").style.visibility = "hidden";
-            // });
         </script>  
     </body>
 </html>
